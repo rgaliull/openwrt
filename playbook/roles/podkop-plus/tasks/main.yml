@@ -65,59 +65,61 @@
   when: pp_check.stdout_lines[-1] == 'NOT_INSTALLED'
 
 - name: Verify podkop-plus binary
-  ansible.builtin.raw: test -x /usr/bin/podkop && echo OK || echo MISSING
+  ansible.builtin.raw: test -x /usr/bin/podkop-plus && echo OK || echo MISSING
   register: pp_bin
   failed_when: "'MISSING' in pp_bin.stdout"
   changed_when: false
 
 - name: Configure podkop-plus UCI
   ansible.builtin.raw: |
-    uci set podkop.settings=podkop
-    uci set podkop.settings.dns_type='{{ podkop_settings.dns_type }}'
-    uci set podkop.settings.dns_server='{{ podkop_settings.dns_server }}'
-    uci set podkop.settings.bootstrap_dns_server='{{ podkop_settings.bootstrap_dns_server }}'
-    uci set podkop.settings.dns_rewrite_ttl='{{ podkop_settings.dns_rewrite_ttl }}'
-    uci delete podkop.settings.source_network_interfaces 2>/dev/null; true
+    uci set podkop-plus.settings=podkop
+    uci set podkop-plus.settings.dns_type='{{ podkop_settings.dns_type }}'
+    uci set podkop-plus.settings.dns_server='{{ podkop_settings.dns_server }}'
+    uci set podkop-plus.settings.bootstrap_dns_server='{{ podkop_settings.bootstrap_dns_server }}'
+    uci set podkop-plus.settings.dns_rewrite_ttl='{{ podkop_settings.dns_rewrite_ttl }}'
+    uci delete podkop-plus.settings.source_network_interfaces 2>/dev/null; true
     {% for iface in podkop_settings.source_network_interfaces %}
-    uci add_list podkop.settings.source_network_interfaces='{{ iface }}'
+    uci add_list podkop-plus.settings.source_network_interfaces='{{ iface }}'
     {% endfor %}
-    uci set podkop.settings.enable_output_network_interface='{{ podkop_settings.enable_output_network_interface }}'
-    uci set podkop.settings.enable_badwan_interface_monitoring='{{ podkop_settings.enable_badwan_interface_monitoring }}'
-    uci set podkop.settings.enable_yacd='{{ podkop_settings.enable_yacd }}'
-    uci set podkop.settings.disable_quic='{{ podkop_settings.disable_quic }}'
-    uci set podkop.settings.update_interval='{{ podkop_settings.update_interval }}'
-    uci set podkop.settings.download_lists_via_proxy='{{ podkop_settings.download_lists_via_proxy }}'
-    uci set podkop.settings.dont_touch_dhcp='{{ podkop_settings.dont_touch_dhcp }}'
-    uci set podkop.settings.config_path='{{ podkop_settings.config_path }}'
-    uci set podkop.settings.cache_path='{{ podkop_settings.cache_path }}'
-    uci set podkop.settings.log_level='{{ podkop_settings.log_level }}'
-    uci set podkop.settings.exclude_ntp='{{ podkop_settings.exclude_ntp }}'
-    uci set podkop.settings.shutdown_correctly='{{ podkop_settings.shutdown_correctly }}'
-    uci set podkop.settings.download_lists_via_proxy_section='{{ podkop_settings.download_lists_via_proxy_section }}'
-    uci set podkop.settings.enable_yacd_wan_access='{{ podkop_settings.enable_yacd_wan_access }}'
-    uci delete podkop.settings.badwan_monitored_interfaces 2>/dev/null; true
+    uci set podkop-plus.settings.enable_output_network_interface='{{ podkop_settings.enable_output_network_interface }}'
+    uci set podkop-plus.settings.enable_badwan_interface_monitoring='{{ podkop_settings.enable_badwan_interface_monitoring }}'
+    uci set podkop-plus.settings.enable_yacd='{{ podkop_settings.enable_yacd }}'
+    uci set podkop-plus.settings.disable_quic='{{ podkop_settings.disable_quic }}'
+    uci set podkop-plus.settings.update_interval='{{ podkop_settings.update_interval }}'
+    uci set podkop-plus.settings.download_lists_via_proxy='{{ podkop_settings.download_lists_via_proxy }}'
+    uci set podkop-plus.settings.dont_touch_dhcp='{{ podkop_settings.dont_touch_dhcp }}'
+    uci set podkop-plus.settings.config_path='{{ podkop_settings.config_path }}'
+    uci set podkop-plus.settings.cache_path='{{ podkop_settings.cache_path }}'
+    uci set podkop-plus.settings.log_level='{{ podkop_settings.log_level }}'
+    uci set podkop-plus.settings.exclude_ntp='{{ podkop_settings.exclude_ntp }}'
+    uci set podkop-plus.settings.shutdown_correctly='{{ podkop_settings.shutdown_correctly }}'
+    uci set podkop-plus.settings.download_lists_via_proxy_section='{{ podkop_settings.download_lists_via_proxy_section }}'
+    uci set podkop-plus.settings.enable_yacd_wan_access='{{ podkop_settings.enable_yacd_wan_access }}'
+    uci delete podkop-plus.settings.badwan_monitored_interfaces 2>/dev/null; true
     {% for iface in podkop_settings.badwan_monitored_interfaces %}
-    uci add_list podkop.settings.badwan_monitored_interfaces='{{ iface }}'
+    uci add_list podkop-plus.settings.badwan_monitored_interfaces='{{ iface }}'
     {% endfor %}
-    uci set podkop.settings.badwan_reload_delay='{{ podkop_settings.badwan_reload_delay }}'
-    uci commit podkop
+    uci set podkop-plus.settings.badwan_reload_delay='{{ podkop_settings.badwan_reload_delay }}'
+    uci set podkop-plus.settings.list_update_enabled='{{ podkop_settings.list_update_enabled | default("1") }}'
+    uci commit podkop-plus
 
-    uci set podkop.main=section
-    uci set podkop.main.enabled='{{ podkop_section_main.enabled }}'
-    uci set podkop.main.connection_type='{{ podkop_section_main.connection_type }}'
-    uci set podkop.main.proxy_config_type='{{ podkop_section_main.proxy_config_type }}'
-    uci delete podkop.main.community_lists 2>/dev/null; true
+    uci set podkop-plus.main=section
+    uci set podkop-plus.main.enabled='{{ podkop_section_main.enabled }}'
+    uci set podkop-plus.main.action='{{ podkop_section_main.action | default("outbound") }}'
+    uci set podkop-plus.main.selector_proxy_links='{{ vless_link }}'
+    uci set podkop-plus.main.urltest_enabled='{{ podkop_section_main.urltest_enabled | default("0") }}'
+    uci delete podkop-plus.main.community_lists 2>/dev/null; true
     {% for list in podkop_section_main.community_lists %}
-    uci add_list podkop.main.community_lists='{{ list }}'
+    uci add_list podkop-plus.main.community_lists='{{ list }}'
     {% endfor %}
-    uci set podkop.main.user_domain_list_type='{{ podkop_section_main.user_domain_list_type }}'
-    uci set podkop.main.user_subnet_list_type='{{ podkop_section_main.user_subnet_list_type }}'
-    uci set podkop.main.enable_udp_over_tcp='{{ podkop_section_main.enable_udp_over_tcp }}'
-    uci set podkop.main.mixed_proxy_enabled='{{ podkop_section_main.mixed_proxy_enabled }}'
-    uci set podkop.main.resolve_real_ip_for_routing='{{ podkop_section_main.resolve_real_ip_for_routing }}'
-    uci set podkop.main.user_domains_text='{{ podkop_section_main.user_domains_text | trim }}'
-    uci set podkop.main.user_subnets_text='{{ podkop_section_main.user_subnets_text }}'
-    uci commit podkop
+    uci set podkop-plus.main.user_domain_list_type='{{ podkop_section_main.user_domain_list_type }}'
+    uci set podkop-plus.main.user_subnet_list_type='{{ podkop_section_main.user_subnet_list_type }}'
+    uci set podkop-plus.main.enable_udp_over_tcp='{{ podkop_section_main.enable_udp_over_tcp }}'
+    uci set podkop-plus.main.mixed_proxy_enabled='{{ podkop_section_main.mixed_proxy_enabled }}'
+    uci set podkop-plus.main.resolve_real_ip_for_routing='{{ podkop_section_main.resolve_real_ip_for_routing }}'
+    uci set podkop-plus.main.user_domains_text='{{ podkop_section_main.user_domains_text | trim }}'
+    uci set podkop-plus.main.user_subnets_text='{{ podkop_section_main.user_subnets_text }}'
+    uci commit podkop-plus
   notify: restart podkop
 
 - name: Configure outbound JSON from vless link
@@ -126,10 +128,10 @@
 
 - name: Set podkop-plus outbound JSON
   ansible.builtin.raw: |
-    uci set podkop.main.outbound_json='{{ pp_outbound_json | trim }}'
-    uci commit podkop
+    uci set podkop-plus.main.outbound_json='{{ pp_outbound_json | trim }}'
+    uci commit podkop-plus
   notify: restart podkop
 
-- name: Enable podkop service
-  ansible.builtin.raw: /etc/init.d/podkop enable
+- name: Enable podkop-plus service
+  ansible.builtin.raw: /etc/init.d/podkop-plus enable
   changed_when: false

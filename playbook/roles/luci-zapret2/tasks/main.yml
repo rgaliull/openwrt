@@ -1,0 +1,13 @@
+---
+- name: Deploy luci-app-zapret2 panel
+  ansible.builtin.raw: |
+    BASE="https://raw.githubusercontent.com/edwardgushchin/luci-app-zapret2/main"
+    mkdir -p /www/luci-static/resources/view/zapret2
+    wget -q -O /usr/share/luci/menu.d/luci-app-zapret2.json "$BASE/root/usr/share/luci/menu.d/luci-app-zapret2.json"
+    wget -q -O /usr/share/rpcd/acl.d/luci-app-zapret2.json "$BASE/root/usr/share/rpcd/acl.d/luci-app-zapret2.json"
+    wget -q -O /www/luci-static/resources/view/zapret2/status.js "$BASE/htdocs/luci-static/resources/view/zapret2/status.js"
+    rm -f /tmp/luci-indexcache /tmp/luci-modulecache/* 2>/dev/null || true
+    /etc/init.d/rpcd reload 2>/dev/null || /etc/init.d/rpcd restart 2>/dev/null
+    echo DEPLOYED
+  changed_when: false
+  failed_when: false

@@ -33,12 +33,15 @@
     - role: podkop-plus
       tags: [podkop-plus]
 
+    - role: luci-zapret2
+      tags: [luci-zapret2]
+
     - role: blockcheckw
       tags: [blockcheckw]
 
   post_tasks:
-    - name: Start podkop service
-      ansible.builtin.raw: /etc/init.d/podkop start
+    - name: Start podkop-plus service
+      ansible.builtin.raw: /etc/init.d/podkop-plus start
       changed_when: false
       failed_when: false
 
