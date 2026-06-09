@@ -39,6 +39,9 @@
     - role: blockcheckw
       tags: [blockcheckw]
 
+    - role: blockcheckw-scan
+      tags: [blockcheckw-scan]
+
   post_tasks:
     - name: Start podkop-plus service
       ansible.builtin.raw: /etc/init.d/podkop-plus start

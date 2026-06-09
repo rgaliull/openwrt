@@ -16,7 +16,7 @@ podkop_settings:
   cache_path: /tmp/sing-box/cache.db
   log_level: warn
   exclude_ntp: "1"
-  shutdown_correctly: "1"
+  shutdown_correctly: "0"
   download_lists_via_proxy_section: main
   enable_yacd_wan_access: "0"
   badwan_monitored_interfaces:
@@ -92,3 +92,10 @@ sing_box_extended_version: "1"
 
 podkop_install_url: "https://raw.githubusercontent.com/itdoginfo/podkop/refs/heads/main/install.sh"
 sing_box_extended_install_url: "https://raw.githubusercontent.com/EikeiDev/OpenWRT-sing-box-extended/refs/heads/main/install.sh"
+
+zapret_scan_domains: |
+  youtube.com
+  googlevideo.com
+  discord.com
+  ggpht.com
+  googleapis.com

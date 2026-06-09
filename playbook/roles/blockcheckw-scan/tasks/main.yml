@@ -1,0 +1,54 @@
+---
+- name: Create target domains list
+  ansible.builtin.raw: |
+    cat > /tmp/bcw-targets.txt << 'DOMAINS'
+    {{ zapret_scan_domains | default('youtube.com\ngooglevideo.com\ndiscord.com') }}
+    DOMAINS
+    echo "LIST_CREATED ($(wc -l < /tmp/bcw-targets.txt) domains)"
+
+- name: Run blockcheckw (this takes ~2 minutes)
+  ansible.builtin.raw: |
+    echo "Scanning for best strategy..."
+    blockcheckw universal --domain-list /tmp/bcw-targets.txt --sample 5 --auto --output /tmp/bcw-result.json --workers 64 2>&1
+    echo "SCAN_DONE"
+  timeout: 300
+  register: bcw_scan
+
+- name: Parse best strategy from results
+  ansible.builtin.raw: |
+    BEST=$(python3 -c "
+import json
+with open('/tmp/bcw-result.json') as f:
+    data = json.load(f)
+strategies = data.get('strategies', [])
+if not strategies:
+    print('NO_STRATEGIES')
+    exit(1)
+# Take the best by speed
+best = max(strategies, key=lambda s: s.get('speed_bps', 0))
+print(best.get('strategy', 'NO_STRATEGY'))
+" 2>/dev/null)
+    echo "$BEST"
+  register: bcw_best
+
+- name: Apply strategy to podkop-plus main section
+  ansible.builtin.raw: |
+    STRATEGY="{{ bcw_best.stdout_lines[-1] | trim }}"
+    if [ "$STRATEGY" != "NO_STRATEGIES" ] && [ "$STRATEGY" != "NO_STRATEGY" ] && [ -n "$STRATEGY" ]; then
+      uci set podkop-plus.main.nfqws2_strategy="$STRATEGY"
+      uci commit podkop-plus
+      echo "STRATEGY_APPLIED: $STRATEGY"
+    else
+      echo "NO_VALID_STRATEGY_FOUND"
+    fi
+  when: bcw_best.stdout_lines[-1] != 'NO_STRATEGIES' and bcw_best.stdout_lines[-1] != 'NO_STRATEGY'
+
+- name: Restart podkop-plus to apply
+  ansible.builtin.raw: /etc/init.d/podkop-plus restart
+  failed_when: false
+  when: bcw_best.stdout_lines[-1] != 'NO_STRATEGIES' and bcw_best.stdout_lines[-1] != 'NO_STRATEGY'
+
+- name: Cleanup temp files
+  ansible.builtin.raw: rm -f /tmp/bcw-targets.txt /tmp/bcw-result.json
+  changed_when: false
+  failed_when: false
