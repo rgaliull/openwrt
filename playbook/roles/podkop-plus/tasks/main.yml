@@ -19,45 +19,46 @@
 - name: Install podkop-plus
   ansible.builtin.raw: |
     if [ "{{ pkg_manager }}" = "apk" ]; then
-      apk add --allow-untrusted /root/podkop-plus.ipk 2>/dev/null && echo INSTALLED
+      wget -q --timeout=30 -O /root/podkop-plus.apk \
+        "https://github.com/rgaliull/openwrt/raw/refs/heads/main/all/podkop-plus_0.7.19.6.apk" \
+        && apk add --allow-untrusted /root/podkop-plus.apk && echo INSTALLED
+      rm -f /root/podkop-plus.apk
     else
-      opkg install --nodeps /root/podkop-plus.ipk 2>/dev/null && echo INSTALLED
+      wget -q --timeout=30 -O /root/podkop-plus.ipk \
+        "https://github.com/rgaliull/openwrt/raw/refs/heads/main/all/podkop-plus_0.7.19.6_all.ipk" \
+        && opkg install --nodeps /root/podkop-plus.ipk && echo INSTALLED
+      rm -f /root/podkop-plus.ipk
     fi
-    rm -f /root/podkop-plus.ipk
-  when: pp_check.stdout_lines[-1] == 'NOT_INSTALLED'
-
-- name: Download luci-app-podkop-plus ipk
-  ansible.builtin.raw: |
-    wget -q --timeout=30 -O /root/luci-podkop-plus.ipk \
-      "https://github.com/rgaliull/openwrt/raw/refs/heads/main/all/luci-app-podkop-plus_0.7.19.6_all.ipk" \
-      && echo DOWNLOADED || echo FAILED
   when: pp_check.stdout_lines[-1] == 'NOT_INSTALLED'
 
 - name: Install luci-app-podkop-plus
   ansible.builtin.raw: |
     if [ "{{ pkg_manager }}" = "apk" ]; then
-      apk add --allow-untrusted /root/luci-podkop-plus.ipk 2>/dev/null && echo INSTALLED
+      wget -q --timeout=30 -O /root/luci-pp.apk \
+        "https://github.com/rgaliull/openwrt/raw/refs/heads/main/all/luci-app-podkop-plus_0.7.19.6.apk" \
+        && apk add --allow-untrusted /root/luci-pp.apk && echo INSTALLED
+      rm -f /root/luci-pp.apk
     else
-      opkg install --nodeps /root/luci-podkop-plus.ipk 2>/dev/null && echo INSTALLED
+      wget -q --timeout=30 -O /root/luci-pp.ipk \
+        "https://github.com/rgaliull/openwrt/raw/refs/heads/main/all/luci-app-podkop-plus_0.7.19.6_all.ipk" \
+        && opkg install --nodeps /root/luci-pp.ipk && echo INSTALLED
+      rm -f /root/luci-pp.ipk
     fi
-    rm -f /root/luci-podkop-plus.ipk
-  when: pp_check.stdout_lines[-1] == 'NOT_INSTALLED'
-
-- name: Download luci-i18n-podkop-plus-ru ipk
-  ansible.builtin.raw: |
-    wget -q --timeout=30 -O /root/luci-i18n-pp-ru.ipk \
-      "https://github.com/rgaliull/openwrt/raw/refs/heads/main/all/luci-i18n-podkop-plus-ru_0.7.19.6_all.ipk" \
-      && echo DOWNLOADED || echo FAILED
   when: pp_check.stdout_lines[-1] == 'NOT_INSTALLED'
 
 - name: Install luci-i18n-podkop-plus-ru
   ansible.builtin.raw: |
     if [ "{{ pkg_manager }}" = "apk" ]; then
-      apk add --allow-untrusted /root/luci-i18n-pp-ru.ipk 2>/dev/null
+      wget -q --timeout=30 -O /root/i18n-pp.apk \
+        "https://github.com/rgaliull/openwrt/raw/refs/heads/main/all/luci-i18n-podkop-plus-ru_0.7.19.6.apk" \
+        && apk add --allow-untrusted /root/i18n-pp.apk
+      rm -f /root/i18n-pp.apk
     else
-      opkg install /root/luci-i18n-pp-ru.ipk 2>/dev/null
+      wget -q --timeout=30 -O /root/i18n-pp.ipk \
+        "https://github.com/rgaliull/openwrt/raw/refs/heads/main/all/luci-i18n-podkop-plus-ru_0.7.19.6_all.ipk" \
+        && opkg install /root/i18n-pp.ipk
+      rm -f /root/i18n-pp.ipk
     fi
-    rm -f /root/luci-i18n-pp-ru.ipk
     echo OK
   changed_when: false
   failed_when: false
@@ -81,6 +82,9 @@
     uci add_list podkop.settings.source_network_interfaces='{{ iface }}'
     {% endfor %}
     uci set podkop.settings.enable_output_network_interface='{{ podkop_settings.enable_output_network_interface }}'
+    uci set podkop.settings.enable_badwan_interface_monitoring='{{ podkop_settings.enable_badwan_interface_monitoring }}'
+    uci set podkop.settings.enable_yacd='{{ podkop_settings.enable_yacd }}'
+    uci set podkop.settings.disable_quic='{{ podkop_settings.disable_quic }}'
     uci set podkop.settings.update_interval='{{ podkop_settings.update_interval }}'
     uci set podkop.settings.download_lists_via_proxy='{{ podkop_settings.download_lists_via_proxy }}'
     uci set podkop.settings.dont_touch_dhcp='{{ podkop_settings.dont_touch_dhcp }}'
@@ -90,6 +94,12 @@
     uci set podkop.settings.exclude_ntp='{{ podkop_settings.exclude_ntp }}'
     uci set podkop.settings.shutdown_correctly='{{ podkop_settings.shutdown_correctly }}'
     uci set podkop.settings.download_lists_via_proxy_section='{{ podkop_settings.download_lists_via_proxy_section }}'
+    uci set podkop.settings.enable_yacd_wan_access='{{ podkop_settings.enable_yacd_wan_access }}'
+    uci delete podkop.settings.badwan_monitored_interfaces 2>/dev/null; true
+    {% for iface in podkop_settings.badwan_monitored_interfaces %}
+    uci add_list podkop.settings.badwan_monitored_interfaces='{{ iface }}'
+    {% endfor %}
+    uci set podkop.settings.badwan_reload_delay='{{ podkop_settings.badwan_reload_delay }}'
     uci commit podkop
 
     uci set podkop.main=section
@@ -104,6 +114,7 @@
     uci set podkop.main.user_subnet_list_type='{{ podkop_section_main.user_subnet_list_type }}'
     uci set podkop.main.enable_udp_over_tcp='{{ podkop_section_main.enable_udp_over_tcp }}'
     uci set podkop.main.mixed_proxy_enabled='{{ podkop_section_main.mixed_proxy_enabled }}'
+    uci set podkop.main.resolve_real_ip_for_routing='{{ podkop_section_main.resolve_real_ip_for_routing }}'
     uci set podkop.main.user_domains_text='{{ podkop_section_main.user_domains_text | trim }}'
     uci set podkop.main.user_subnets_text='{{ podkop_section_main.user_subnets_text }}'
     uci commit podkop
