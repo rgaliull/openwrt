@@ -1,0 +1,83 @@
+---
+- name: Stop zapret before heavy install (free RAM)
+  ansible.builtin.raw: /etc/init.d/zapret stop 2>/dev/null; true
+  failed_when: false
+  changed_when: false
+
+- name: Stop podkop-plus if running
+  ansible.builtin.raw: /etc/init.d/podkop-plus stop 2>/dev/null; true
+  failed_when: false
+  changed_when: false
+
+- name: Stop podkop if running
+  ansible.builtin.raw: /etc/init.d/podkop stop 2>/dev/null; true
+  failed_when: false
+  changed_when: false
+
+- name: Remove podkop-plus and its LuCI
+  ansible.builtin.raw: |
+    if [ "{{ pkg_manager }}" = "apk" ]; then
+      apk del podkop-plus luci-app-podkop-plus luci-i18n-podkop-plus-ru 2>/dev/null
+    else
+      opkg remove podkop-plus luci-app-podkop-plus luci-i18n-podkop-plus-ru 2>/dev/null
+    fi
+    true
+  failed_when: false
+  changed_when: false
+
+- name: Remove stock sing-box package (only if not extended)
+  ansible.builtin.raw: |
+    # Only remove stock sing-box if extended is NOT installed
+    if [ -x /usr/bin/sing-box ]; then
+      VER=$(sing-box version 2>/dev/null | head -1)
+      if echo "$VER" | grep -q extended; then
+        echo "SKIP: sing-box-extended already installed"
+      else
+        rm -f /usr/bin/sing-box
+        if [ "{{ pkg_manager }}" = "apk" ]; then
+          apk del sing-box 2>/dev/null
+        else
+          opkg remove sing-box 2>/dev/null
+        fi
+        echo "REMOVED stock sing-box"
+      fi
+    else
+      echo "SKIP: no sing-box found"
+    fi
+    true
+  register: cleanup_singbox
+  failed_when: false
+  changed_when: "'REMOVED' in cleanup_singbox.stdout"
+
+- name: Drop caches
+  ansible.builtin.raw: sync; echo 3 > /proc/sys/vm/drop_caches
+  failed_when: false
+  changed_when: false
+
+- name: Show free space
+  ansible.builtin.raw: df -h /overlay
+  register: cleanup_df
+  changed_when: false
+  failed_when: false
+
+- name: Show free space
+  ansible.builtin.debug:
+    msg: "{{ cleanup_df.stdout_lines | default([]) }}"
+
+- name: Remove old podkop xhttp patch backups (keep latest)
+  ansible.builtin.raw: |
+    for pattern in podkop.backup sing_box_config_facade.sh.backup; do
+      LATEST=$(ls -1t /root/${pattern}.* 2>/dev/null | head -1)
+      if [ -n "$LATEST" ]; then
+        ls /root/${pattern}.* 2>/dev/null | grep -v "$LATEST" | while read f; do rm -f "$f"; done
+      fi
+    done
+    echo CLEANED
+  changed_when: false
+  failed_when: false
+
+- name: Clean APK cache
+  ansible.builtin.raw: apk cache clean 2>/dev/null; rm -f /var/cache/apk/APKINDEX.*.tar.gz 2>/dev/null; echo OK
+  changed_when: false
+  failed_when: false
+  when: pkg_manager == 'apk'

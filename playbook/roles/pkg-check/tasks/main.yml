@@ -1,0 +1,49 @@
+---
+- name: Detect package manager
+  ansible.builtin.raw: |
+    if command -v apk >/dev/null 2>&1 && ! echo "$(command -v apk)" | grep -q /opt/bin/apk; then echo apk
+    elif command -v opkg >/dev/null 2>&1; then echo opkg
+    else echo none
+    fi
+  register: pkg_mgr
+  changed_when: false
+
+- name: Set package manager fact
+  ansible.builtin.set_fact:
+    pkg_manager: "{{ pkg_mgr.stdout_lines[-1] }}"
+
+- name: Show package manager
+  ansible.builtin.debug:
+    msg: "Package manager: {{ pkg_manager }}"
+
+- name: Install zram-swap for compressed RAM swap
+  ansible.builtin.raw: |
+    if [ "{{ pkg_manager }}" = "apk" ]; then
+      apk add zram-swap 2>/dev/null
+    else
+      opkg update 2>/dev/null
+      opkg install zram-swap 2>/dev/null
+    fi
+    echo DONE
+  register: zram_install
+  changed_when: true
+  failed_when: false
+
+- name: Enable and start zram-swap
+  ansible.builtin.raw: |
+    /etc/init.d/zram-swap enable 2>/dev/null
+    /etc/init.d/zram-swap start 2>/dev/null
+    echo STARTED
+  changed_when: false
+  failed_when: false
+  when: zram_install.rc == 0
+
+- name: Show swap status
+  ansible.builtin.raw: free -m 2>/dev/null || free
+  register: swap_status
+  changed_when: false
+  failed_when: false
+
+- name: Show memory
+  ansible.builtin.debug:
+    msg: "{{ swap_status.stdout_lines | default(['skipped']) }}"

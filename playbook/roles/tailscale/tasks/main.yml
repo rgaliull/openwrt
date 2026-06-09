@@ -1,0 +1,125 @@
+---
+- name: Ensure kmod-tun is installed
+  ansible.builtin.raw: |
+    if lsmod | grep -q '^tun '; then
+      echo "TUN_LOADED"
+    else
+      modprobe tun 2>/dev/null && echo "TUN_LOADED" || echo "TUN_FAILED"
+    fi
+    if [ "{{ pkg_manager }}" = "apk" ]; then
+      apk info -e kmod-tun 2>/dev/null || apk add kmod-tun 2>/dev/null && echo "KMOD_OK"
+    else
+      opkg list-installed 2>/dev/null | grep -q '^kmod-tun ' || opkg install kmod-tun 2>/dev/null
+    fi
+  register: tun_check
+  changed_when: false
+  failed_when: false
+
+- name: Check if tailscaled needs replacing
+  ansible.builtin.raw: |
+    if [ -f /usr/sbin/tailscaled ]; then
+      wc -c < /usr/sbin/tailscaled
+    elif [ -f /usr/sbin/tailscale ]; then
+      wc -c < /usr/sbin/tailscale
+    else
+      echo "0"
+    fi
+  register: ts_size
+  changed_when: false
+
+- name: Skip — already small
+  ansible.builtin.debug:
+    msg: "tailscaled already small ({{ ts_size.stdout_lines[-1] | trim }} bytes), skipping"
+  when: ts_size.stdout_lines[-1] | trim | int <= 8000000
+
+- name: Detect architecture
+  ansible.builtin.raw: |
+    if [ "{{ pkg_manager }}" = "apk" ]; then
+      cat /etc/apk/arch
+    else
+      opkg print-architecture 2>/dev/null | awk 'NF>=2 {print $2}' | grep -v '^all$' | tail -1
+    fi
+  register: ts_arch_raw
+  changed_when: false
+  when: ts_size.stdout_lines[-1] | trim | int > 8000000
+
+- name: Set arch fact
+  ansible.builtin.set_fact:
+    ts_arch: "{{ ts_arch_raw.stdout_lines[-1] | trim }}"
+  when: ts_size.stdout_lines[-1] | trim | int > 8000000
+
+- name: Download tailscale-lite ipk from repo
+  ansible.builtin.raw: |
+    wget -q --timeout=30 -O /root/tailscale-lite.ipk \
+      "https://github.com/rgaliull/openwrt/raw/refs/heads/main/aarch64_cortex-a53/tailscale-lite_1.94.2-r1_{{ ts_arch }}.ipk" \
+      && echo DOWNLOADED || echo FAILED
+  when: ts_size.stdout_lines[-1] | trim | int > 8000000
+
+- name: Extract tailscaled from ipk and replace
+  ansible.builtin.raw: |
+    rm -rf /root/ts-extract
+    mkdir -p /root/ts-extract
+    tar -xzf /root/tailscale-lite.ipk -C /root/ts-extract
+    tar -xzf /root/ts-extract/data.tar.gz -C /root/ts-extract
+    BIN=$(find /root/ts-extract -name tailscaled -type f 2>/dev/null | head -1)
+    if [ -n "$BIN" ] && [ -s "$BIN" ]; then
+      cp "$BIN" /usr/sbin/tailscaled
+      chmod +x /usr/sbin/tailscaled
+      echo "REPLACED"
+    else
+      echo "EXTRACT_FAILED"
+    fi
+    rm -rf /root/ts-extract /root/tailscale-lite.ipk
+  when: ts_size.stdout_lines[-1] | trim | int > 8000000
+  register: ts_replace
+
+- name: Download luci-i18n ipk from repo
+  ansible.builtin.raw: |
+    wget -q --timeout=30 -O /root/luci-i18n-tailscale-ru.ipk \
+      "https://github.com/rgaliull/openwrt/raw/refs/heads/main/all/luci-i18n-tailscale-ru_26.012.45362~8b7f8c8_all.ipk" \
+      && echo DOWNLOADED || echo FAILED
+  when: ts_size.stdout_lines[-1] | trim | int > 8000000
+
+- name: Install luci-i18n-tailscale-ru
+  ansible.builtin.raw: |
+    if [ "{{ pkg_manager }}" = "apk" ]; then
+      apk add --allow-untrusted /root/luci-i18n-tailscale-ru.ipk 2>/dev/null
+    else
+      opkg install /root/luci-i18n-tailscale-ru.ipk 2>/dev/null
+    fi
+    rm -f /root/luci-i18n-tailscale-ru.ipk
+    echo "OK"
+  changed_when: false
+  failed_when: false
+  when: ts_size.stdout_lines[-1] | trim | int > 8000000
+
+- name: Apply GOGC=10 for lower RAM usage
+  ansible.builtin.raw: |
+    if [ -f /etc/init.d/tailscale ]; then
+      if grep -q 'GOGC=' /etc/init.d/tailscale; then
+        echo "GOGC_ALREADY_SET"
+      else
+        sed -i 's/procd_set_param env TS_DEBUG_FIREWALL_MODE="\$fw_mode"/procd_set_param env TS_DEBUG_FIREWALL_MODE="\$fw_mode" GOGC=10/' /etc/init.d/tailscale
+        grep -q 'GOGC=10' /etc/init.d/tailscale && echo "GOGC_APPLIED" || echo "GOGC_FAILED"
+      fi
+    else
+      echo "NO_INIT_SCRIPT"
+    fi
+  changed_when: false
+  failed_when: false
+
+- name: Drop caches
+  ansible.builtin.raw: sync; echo 3 > /proc/sys/vm/drop_caches
+  failed_when: false
+  changed_when: false
+  when: ts_size.stdout_lines[-1] | trim | int > 8000000
+
+- name: Show new size
+  ansible.builtin.raw: ls -lh /usr/sbin/tailscaled
+  register: ts_new_size
+  changed_when: false
+  when: ts_size.stdout_lines[-1] | trim | int > 8000000
+
+- name: Result
+  ansible.builtin.debug:
+    msg: "{{ ts_new_size.stdout_lines | default(['skipped']) }}"

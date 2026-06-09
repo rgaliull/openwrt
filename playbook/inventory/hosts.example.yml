@@ -1,0 +1,18 @@
+# Шаблон инвентори — скопируй и заполни своими данными
+# Реальный файл (с паролями и vless-ссылками) НЕ коммить!
+
+all:
+  children:
+    openwrt:
+      hosts:
+        # Пример роутера
+        my-router:
+          ansible_host: 192.168.1.1
+          ansible_user: root
+          ansible_password: YOUR_PASSWORD
+          ansible_connection: ssh
+          ansible_shell_type: sh
+          ansible_python_interpreter: /usr/bin/python3
+          ansible_ssh_common_args: '-o ControlMaster=no'
+
+          vless_link: "vless://uuid@server:443?...type=xhttp&security=reality&#tag"

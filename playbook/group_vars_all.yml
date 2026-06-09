@@ -1,0 +1,94 @@
+podkop_settings:
+  dns_type: dot
+  dns_server: "8.8.8.8"
+  bootstrap_dns_server: "77.88.8.8"
+  dns_rewrite_ttl: "60"
+  source_network_interfaces:
+    - br-lan
+  enable_output_network_interface: "0"
+  enable_badwan_interface_monitoring: "1"
+  enable_yacd: "1"
+  disable_quic: "1"
+  update_interval: 1d
+  download_lists_via_proxy: "1"
+  dont_touch_dhcp: "0"
+  config_path: /etc/sing-box/config.json
+  cache_path: /tmp/sing-box/cache.db
+  log_level: warn
+  exclude_ntp: "1"
+  shutdown_correctly: "1"
+  download_lists_via_proxy_section: main
+  enable_yacd_wan_access: "0"
+  badwan_monitored_interfaces:
+    - wan
+  badwan_reload_delay: "2000"
+
+podkop_section_main:
+  enabled: "1"
+  connection_type: proxy
+  proxy_config_type: outbound
+  community_lists:
+    - telegram
+    - meta
+    - hodca
+    - geoblock
+  user_domains_text: |
+    ntc.party
+    claude.ai
+    claude.com
+    anthropic.com
+    pangolin.net
+    community-scripts.org
+    plugnmeet.com
+    mirotalk.com
+    docker.org
+    docker.com
+    docker.io
+    ghcr.io
+    chatgpt.com
+    pocket-id.org
+    showmyip.com
+    hp.com
+    openh264.org
+    fedoraproject.org
+    2ip.ru
+    github.com
+    freemacsoft.net
+  user_subnets_text: "17.0.0.0/8"
+  resolve_real_ip_for_routing: "0"
+  enable_udp_over_tcp: "0"
+  mixed_proxy_enabled: "0"
+  user_domain_list_type: text
+  user_subnet_list_type: text
+
+zapret_config:
+  FWTYPE: nftables
+  POSTNAT: "1"
+  FLOWOFFLOAD: none
+  INIT_APPLY_FW: "1"
+  DISABLE_IPV4: "0"
+  DISABLE_IPV6: "1"
+  FILTER_TTL_EXPIRED_ICMP: "1"
+  MODE_FILTER: hostlist
+  WS_USER: daemon
+  NFQWS_ENABLE: "1"
+  DESYNC_MARK: "0x40000000"
+  DESYNC_MARK_POSTNAT: "0x20000000"
+  NFQWS_PORTS_TCP: "80,443,2053,2083,2087,2096,8443"
+  NFQWS_PORTS_UDP: "443,19294-19344,50000-50100,88,1024-2407,2409-4499,4501-19293,19345-49999,50101-65535"
+  NFQWS_TCP_PKT_OUT: "9"
+  NFQWS_TCP_PKT_IN: "3"
+  NFQWS_UDP_PKT_OUT: "9"
+  NFQWS_UDP_PKT_IN: "0"
+  DAEMON_LOG_ENABLE: "0"
+  DAEMON_LOG_SIZE_MAX: "2000"
+  AUTOHOSTLIST_RETRANS_THRESHOLD: "3"
+  AUTOHOSTLIST_FAIL_THRESHOLD: "3"
+  AUTOHOSTLIST_FAIL_TIME: "60"
+  AUTOHOSTLIST_DEBUGLOG: "0"
+  GZIP_LISTS: "0"
+
+sing_box_extended_version: "1"
+
+podkop_install_url: "https://raw.githubusercontent.com/itdoginfo/podkop/refs/heads/main/install.sh"
+sing_box_extended_install_url: "https://raw.githubusercontent.com/EikeiDev/OpenWRT-sing-box-extended/refs/heads/main/install.sh"

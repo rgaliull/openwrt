@@ -1,0 +1,73 @@
+---
+- name: Deploy podkop + sing-box-extended + zapret to OpenWrt routers
+  hosts: openwrt
+  gather_facts: false
+  vars:
+    zapret_nfqws_strategy: >-
+      --filter-tcp=443
+      --hostlist=/opt/zapret/ipset/zapret-hosts-google.txt
+      --dpi-desync=fake,multisplit
+      --dpi-desync-split-pos=2,sld
+      --dpi-desync-fake-tls=0x0F0F0F0F
+      --dpi-desync-fake-tls=/opt/zapret/files/fake/tls_clienthello_www_google_com.bin
+      --dpi-desync-fake-tls-mod=rnd,dupsid,sni=ggpht.com
+      --dpi-desync-split-seqovl=620
+      --dpi-desync-split-seqovl-pattern=/opt/zapret/files/fake/tls_clienthello_www_google_com.bin
+      --dpi-desync-fooling=badsum,badseq
+
+  tasks:
+    - name: Wait for SSH
+      ansible.builtin.raw: echo OK
+      changed_when: false
+
+    - name: Show target info
+      ansible.builtin.raw: cat /etc/openwrt_release
+      register: openwrt_release
+      changed_when: false
+
+    - name: Show info
+      ansible.builtin.debug:
+        msg: "{{ openwrt_release.stdout_lines | default(['skipped']) }}"
+
+  roles:
+    - role: pkg-check
+      tags: [always]
+
+    - role: zapret
+      tags: [zapret]
+
+    - role: cleanup
+      tags: [cleanup]
+
+    - role: tailscale
+      tags: [tailscale]
+
+    - role: sing-box-extended
+      tags: [sing-box-extended]
+
+    - role: podkop
+      tags: [podkop]
+
+    - role: patch
+      tags: [patch]
+
+  post_tasks:
+    - name: Start podkop service
+      ansible.builtin.raw: /etc/init.d/podkop start
+      changed_when: false
+      failed_when: false
+
+    - name: Start zapret service
+      ansible.builtin.raw: /etc/init.d/zapret restart
+      changed_when: false
+      failed_when: false
+
+    - name: Show running services
+      ansible.builtin.raw: ps | grep -E "sing-box|nfqws|podkop" | grep -v grep
+      register: running_procs
+      changed_when: false
+      failed_when: false
+
+    - name: Show processes
+      ansible.builtin.debug:
+        msg: "{{ running_procs.stdout_lines | default(['no processes']) }}"

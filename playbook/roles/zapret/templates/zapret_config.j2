@@ -1,0 +1,61 @@
+#!/bin/sh
+# zapret config - managed by ansible
+
+FWTYPE={{ zapret_config.FWTYPE }}
+WS_USER="{{ zapret_config.WS_USER }}"
+POSTNAT={{ zapret_config.POSTNAT }}
+
+SET_MAXELEM=522288
+IPSET_OPT="hashsize 262144 maxelem $SET_MAXELEM"
+
+IP2NET_OPT4="--prefix-length=22-30 --v4-threshold=3/4"
+IP2NET_OPT6="--prefix-length=56-64 --v6-threshold=5"
+
+AUTOHOSTLIST_RETRANS_THRESHOLD={{ zapret_config.AUTOHOSTLIST_RETRANS_THRESHOLD }}
+AUTOHOSTLIST_FAIL_THRESHOLD={{ zapret_config.AUTOHOSTLIST_FAIL_THRESHOLD }}
+AUTOHOSTLIST_FAIL_TIME={{ zapret_config.AUTOHOSTLIST_FAIL_TIME }}
+AUTOHOSTLIST_DEBUGLOG={{ zapret_config.AUTOHOSTLIST_DEBUGLOG }}
+
+MDIG_THREADS=30
+
+GZIP_LISTS={{ zapret_config.GZIP_LISTS }}
+
+MODE_FILTER={{ zapret_config.MODE_FILTER }}
+
+DESYNC_MARK={{ zapret_config.DESYNC_MARK }}
+DESYNC_MARK_POSTNAT={{ zapret_config.DESYNC_MARK_POSTNAT }}
+
+FILTER_MARK=""
+
+TPWS_SOCKS_ENABLE=0
+TPWS_ENABLE=0
+
+NFQWS_ENABLE={{ zapret_config.NFQWS_ENABLE }}
+
+NFQWS_PORTS_TCP="{{ zapret_config.NFQWS_PORTS_TCP }}"
+NFQWS_PORTS_UDP="{{ zapret_config.NFQWS_PORTS_UDP }}"
+
+NFQWS_TCP_PKT_OUT="{{ zapret_config.NFQWS_TCP_PKT_OUT }}"
+NFQWS_TCP_PKT_IN="{{ zapret_config.NFQWS_TCP_PKT_IN }}"
+NFQWS_UDP_PKT_OUT="{{ zapret_config.NFQWS_UDP_PKT_OUT }}"
+NFQWS_UDP_PKT_IN="{{ zapret_config.NFQWS_UDP_PKT_IN }}"
+
+NFQWS_PORTS_TCP_KEEPALIVE=""
+NFQWS_PORTS_UDP_KEEPALIVE=""
+
+NFQWS_OPT='{{ zapret_nfqws_strategy }}'
+
+DISABLE_CUSTOM=0
+
+FLOWOFFLOAD={{ zapret_config.FLOWOFFLOAD }}
+
+INIT_APPLY_FW={{ zapret_config.INIT_APPLY_FW }}
+
+DISABLE_IPV4={{ zapret_config.DISABLE_IPV4 }}
+DISABLE_IPV6={{ zapret_config.DISABLE_IPV6 }}
+
+FILTER_TTL_EXPIRED_ICMP={{ zapret_config.FILTER_TTL_EXPIRED_ICMP }}
+
+DAEMON_LOG_ENABLE={{ zapret_config.DAEMON_LOG_ENABLE }}
+DAEMON_LOG_SIZE_MAX={{ zapret_config.DAEMON_LOG_SIZE_MAX }}
+DAEMON_LOG_FILE="/tmp/zapret+<DAEMON_NAME>+<DAEMON_IDNUM>+<DAEMON_CFGNAME>.log"

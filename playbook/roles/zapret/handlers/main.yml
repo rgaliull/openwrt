@@ -1,0 +1,4 @@
+---
+- name: restart zapret
+  ansible.builtin.raw: /etc/init.d/zapret restart
+  failed_when: false

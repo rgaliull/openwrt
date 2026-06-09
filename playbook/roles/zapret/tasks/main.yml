@@ -1,0 +1,168 @@
+---
+- name: Check if zapret is already installed
+  ansible.builtin.raw: |
+    if [ "{{ pkg_manager }}" = "apk" ]; then
+      apk info -e zapret 2>/dev/null && echo INSTALLED || echo NOT_INSTALLED
+    else
+      opkg list-installed 2>/dev/null | grep -q "^zapret " && echo INSTALLED || echo NOT_INSTALLED
+    fi
+  register: zapret_check
+  changed_when: false
+
+- name: Install zapret package
+  ansible.builtin.raw: |
+    if [ "{{ pkg_manager }}" = "apk" ]; then
+      ZAPRET_VER="v72.20260307"
+      ARCH=$(cat /etc/apk/arch)
+      wget -q --timeout=60 -O /tmp/zapret.zip "https://github.com/rgaliull/openwrt/raw/refs/heads/main/$ARCH/zapret_${ZAPRET_VER}_$ARCH.zip" || { echo DOWNLOAD_FAILED; exit 1; }
+      mkdir -p /tmp/ze
+      unzip -o /tmp/zapret.zip -d /tmp/ze >/dev/null 2>&1
+      apk add --allow-untrusted /tmp/ze/apk/*.apk
+      rm -rf /tmp/zapret.zip /tmp/ze
+    else
+      opkg update
+      opkg install zapret luci-app-zapret
+    fi
+  when:
+    - zapret_check.stdout_lines is defined
+    - zapret_check.stdout_lines[-1] == 'NOT_INSTALLED'
+  register: zapret_install
+  changed_when: true
+  failed_when: "zapret_install.rc != 0 and 'already-installed' not in (zapret_install.stderr | default(''))"
+  timeout: 120
+
+- name: Deploy zapret config
+  ansible.builtin.raw: |
+    cat > /opt/zapret/config << 'ZAPRET_CONFIG_EOF'
+    #!/bin/sh
+    # zapret config - managed by ansible
+
+    FWTYPE={{ zapret_config.FWTYPE }}
+    WS_USER="{{ zapret_config.WS_USER }}"
+    POSTNAT={{ zapret_config.POSTNAT }}
+
+    SET_MAXELEM=522288
+    IPSET_OPT="hashsize 262144 maxelem $SET_MAXELEM"
+
+    IP2NET_OPT4="--prefix-length=22-30 --v4-threshold=3/4"
+    IP2NET_OPT6="--prefix-length=56-64 --v6-threshold=5"
+
+    AUTOHOSTLIST_RETRANS_THRESHOLD={{ zapret_config.AUTOHOSTLIST_RETRANS_THRESHOLD }}
+    AUTOHOSTLIST_FAIL_THRESHOLD={{ zapret_config.AUTOHOSTLIST_FAIL_THRESHOLD }}
+    AUTOHOSTLIST_FAIL_TIME={{ zapret_config.AUTOHOSTLIST_FAIL_TIME }}
+    AUTOHOSTLIST_DEBUGLOG={{ zapret_config.AUTOHOSTLIST_DEBUGLOG }}
+
+    MDIG_THREADS=30
+
+    GZIP_LISTS={{ zapret_config.GZIP_LISTS }}
+
+    MODE_FILTER={{ zapret_config.MODE_FILTER }}
+
+    DESYNC_MARK={{ zapret_config.DESYNC_MARK }}
+    DESYNC_MARK_POSTNAT={{ zapret_config.DESYNC_MARK_POSTNAT }}
+
+    FILTER_MARK=""
+
+    TPWS_SOCKS_ENABLE=0
+    TPWS_ENABLE=0
+
+    NFQWS_ENABLE={{ zapret_config.NFQWS_ENABLE }}
+
+    NFQWS_PORTS_TCP="{{ zapret_config.NFQWS_PORTS_TCP }}"
+    NFQWS_PORTS_UDP="{{ zapret_config.NFQWS_PORTS_UDP }}"
+
+    NFQWS_TCP_PKT_OUT="{{ zapret_config.NFQWS_TCP_PKT_OUT }}"
+    NFQWS_TCP_PKT_IN="{{ zapret_config.NFQWS_TCP_PKT_IN }}"
+    NFQWS_UDP_PKT_OUT="{{ zapret_config.NFQWS_UDP_PKT_OUT }}"
+    NFQWS_UDP_PKT_IN="{{ zapret_config.NFQWS_UDP_PKT_IN }}"
+
+    NFQWS_PORTS_TCP_KEEPALIVE=""
+    NFQWS_PORTS_UDP_KEEPALIVE=""
+
+    NFQWS_OPT='{{ zapret_nfqws_strategy }}'
+
+    DISABLE_CUSTOM=0
+
+    FLOWOFFLOAD={{ zapret_config.FLOWOFFLOAD }}
+
+    INIT_APPLY_FW={{ zapret_config.INIT_APPLY_FW }}
+
+    DISABLE_IPV4={{ zapret_config.DISABLE_IPV4 }}
+    DISABLE_IPV6={{ zapret_config.DISABLE_IPV6 }}
+
+    FILTER_TTL_EXPIRED_ICMP={{ zapret_config.FILTER_TTL_EXPIRED_ICMP }}
+
+    DAEMON_LOG_ENABLE={{ zapret_config.DAEMON_LOG_ENABLE }}
+    DAEMON_LOG_SIZE_MAX={{ zapret_config.DAEMON_LOG_SIZE_MAX }}
+    DAEMON_LOG_FILE="/tmp/zapret+<DAEMON_NAME>+<DAEMON_IDNUM>+<DAEMON_CFGNAME>.log"
+    ZAPRET_CONFIG_EOF
+  notify: restart zapret
+
+- name: Render zapret google hostlist locally
+  ansible.builtin.set_fact:
+    zapret_google_hostlist: "{{ lookup('file', role_path + '/templates/zapret-hosts-google.txt.j2') }}"
+
+- name: Deploy zapret google hostlist
+  ansible.builtin.raw: |
+    cat > /opt/zapret/ipset/zapret-hosts-google.txt << 'HOSTLIST_EOF'
+    {{ zapret_google_hostlist }}
+    HOSTLIST_EOF
+  notify: restart zapret
+
+- name: Render zapret user hostlist locally
+  ansible.builtin.set_fact:
+    zapret_user_hostlist: "{{ lookup('file', role_path + '/templates/zapret-hosts-user.txt.j2') }}"
+
+- name: Deploy zapret user hostlist
+  ansible.builtin.raw: |
+    cat > /opt/zapret/ipset/zapret-hosts-user.txt << 'HOSTLIST_EOF'
+    {{ zapret_user_hostlist }}
+    HOSTLIST_EOF
+  notify: restart zapret
+
+- name: Render zapret user exclude hostlist locally
+  ansible.builtin.set_fact:
+    zapret_user_exclude_hostlist: "{{ lookup('file', role_path + '/templates/zapret-hosts-user-exclude.txt.j2') }}"
+
+- name: Deploy zapret user exclude hostlist
+  ansible.builtin.raw: |
+    cat > /opt/zapret/ipset/zapret-hosts-user-exclude.txt << 'HOSTLIST_EOF'
+    {{ zapret_user_exclude_hostlist }}
+    HOSTLIST_EOF
+  notify: restart zapret
+
+- name: Configure zapret UCI
+  ansible.builtin.raw: |
+    uci set zapret.config.run_on_boot='1'
+    uci set zapret.config.FWTYPE='{{ zapret_config.FWTYPE }}'
+    uci set zapret.config.POSTNAT='{{ zapret_config.POSTNAT }}'
+    uci set zapret.config.FLOWOFFLOAD='{{ zapret_config.FLOWOFFLOAD }}'
+    uci set zapret.config.INIT_APPLY_FW='{{ zapret_config.INIT_APPLY_FW }}'
+    uci set zapret.config.DISABLE_IPV4='{{ zapret_config.DISABLE_IPV4 }}'
+    uci set zapret.config.DISABLE_IPV6='{{ zapret_config.DISABLE_IPV6 }}'
+    uci set zapret.config.FILTER_TTL_EXPIRED_ICMP='{{ zapret_config.FILTER_TTL_EXPIRED_ICMP }}'
+    uci set zapret.config.MODE_FILTER='{{ zapret_config.MODE_FILTER }}'
+    uci set zapret.config.WS_USER='{{ zapret_config.WS_USER }}'
+    uci set zapret.config.NFQWS_ENABLE='{{ zapret_config.NFQWS_ENABLE }}'
+    uci set zapret.config.DESYNC_MARK='{{ zapret_config.DESYNC_MARK }}'
+    uci set zapret.config.DESYNC_MARK_POSTNAT='{{ zapret_config.DESYNC_MARK_POSTNAT }}'
+    uci set zapret.config.NFQWS_PORTS_TCP='{{ zapret_config.NFQWS_PORTS_TCP }}'
+    uci set zapret.config.NFQWS_PORTS_UDP='{{ zapret_config.NFQWS_PORTS_UDP }}'
+    uci set zapret.config.NFQWS_TCP_PKT_OUT='{{ zapret_config.NFQWS_TCP_PKT_OUT }}'
+    uci set zapret.config.NFQWS_TCP_PKT_IN='{{ zapret_config.NFQWS_TCP_PKT_IN }}'
+    uci set zapret.config.NFQWS_UDP_PKT_OUT='{{ zapret_config.NFQWS_UDP_PKT_OUT }}'
+    uci set zapret.config.NFQWS_UDP_PKT_IN='{{ zapret_config.NFQWS_UDP_PKT_IN }}'
+    uci set zapret.config.DAEMON_LOG_ENABLE='{{ zapret_config.DAEMON_LOG_ENABLE }}'
+    uci set zapret.config.DAEMON_LOG_SIZE_MAX='{{ zapret_config.DAEMON_LOG_SIZE_MAX }}'
+    uci set zapret.config.AUTOHOSTLIST_RETRANS_THRESHOLD='{{ zapret_config.AUTOHOSTLIST_RETRANS_THRESHOLD }}'
+    uci set zapret.config.AUTOHOSTLIST_FAIL_THRESHOLD='{{ zapret_config.AUTOHOSTLIST_FAIL_THRESHOLD }}'
+    uci set zapret.config.AUTOHOSTLIST_FAIL_TIME='{{ zapret_config.AUTOHOSTLIST_FAIL_TIME }}'
+    uci set zapret.config.AUTOHOSTLIST_DEBUGLOG='{{ zapret_config.AUTOHOSTLIST_DEBUGLOG }}'
+    uci set zapret.config.GZIP_LISTS='{{ zapret_config.GZIP_LISTS }}'
+    uci set zapret.config.NFQWS_OPT='{{ zapret_nfqws_strategy }}'
+    uci commit zapret
+  notify: restart zapret
+
+- name: Enable zapret service
+  ansible.builtin.raw: /etc/init.d/zapret enable
+  changed_when: false
