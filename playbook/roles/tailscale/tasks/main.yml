@@ -73,6 +73,23 @@
   when: ts_size.stdout_lines[-1] | trim | int > 8000000
   register: ts_replace
 
+- name: Install luci-app-tailscale-community
+  ansible.builtin.raw: |
+    wget -q --timeout=30 -O /root/luci-app-tailscale-community.ipk \
+      "https://github.com/rgaliull/openwrt/raw/refs/heads/main/all/luci-app-tailscale-community_4.0.0-r1_all.ipk" \
+      && echo DOWNLOADED || echo FAILED
+    if [ -f /root/luci-app-tailscale-community.ipk ]; then
+      if [ "{{ pkg_manager }}" = "apk" ]; then
+        apk add --allow-untrusted /root/luci-app-tailscale-community.ipk 2>/dev/null
+      else
+        opkg install /root/luci-app-tailscale-community.ipk 2>/dev/null
+      fi
+      rm -f /root/luci-app-tailscale-community.ipk
+    fi
+    echo "OK"
+  changed_when: false
+  failed_when: false
+
 - name: Download luci-i18n ipk from repo
   ansible.builtin.raw: |
     wget -q --timeout=30 -O /root/luci-i18n-tailscale-ru.ipk \
