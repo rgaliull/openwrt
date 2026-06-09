@@ -1,0 +1,4 @@
+---
+- name: restart podkop
+  ansible.builtin.raw: /etc/init.d/podkop restart
+  failed_when: false

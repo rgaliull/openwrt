@@ -1,0 +1,73 @@
+---
+- name: Deploy podkop-plus + sing-box-extended + blockcheckw to OpenWrt routers
+  hosts: openwrt
+  gather_facts: false
+
+  tasks:
+    - name: Wait for SSH
+      ansible.builtin.raw: echo OK
+      changed_when: false
+
+    - name: Show target info
+      ansible.builtin.raw: cat /etc/openwrt_release
+      register: openwrt_release
+      changed_when: false
+
+    - name: Show info
+      ansible.builtin.debug:
+        msg: "{{ openwrt_release.stdout_lines | default(['skipped']) }}"
+
+  roles:
+    - role: pkg-check
+      tags: [always]
+
+    - role: cleanup
+      tags: [cleanup]
+
+    - role: tailscale
+      tags: [tailscale]
+
+    - role: sing-box-extended
+      tags: [sing-box-extended]
+
+    - role: podkop-plus
+      tags: [podkop-plus]
+
+    - role: blockcheckw
+      tags: [blockcheckw]
+
+  post_tasks:
+    - name: Start podkop service
+      ansible.builtin.raw: /etc/init.d/podkop start
+      changed_when: false
+      failed_when: false
+
+    - name: Show running services
+      ansible.builtin.raw: ps | grep -E "sing-box|nfqws|podkop|blockcheckw" | grep -v grep
+      register: running_procs
+      changed_when: false
+      failed_when: false
+
+    - name: Show processes
+      ansible.builtin.debug:
+        msg: "{{ running_procs.stdout_lines | default(['no processes']) }}"
+
+    - name: Show memory
+      ansible.builtin.raw: free -m 2>/dev/null || free
+      register: mem
+      changed_when: false
+      failed_when: false
+
+    - name: Show memory
+      ansible.builtin.debug:
+        msg: "{{ mem.stdout_lines | default(['skipped']) }}"
+
+    - name: Show overlay
+      ansible.builtin.raw: df -h /overlay
+      register: overlay
+      changed_when: false
+      failed_when: false
+
+    - name: Show overlay
+      ansible.builtin.debug:
+        msg: "{{ overlay.stdout_lines | default(['skipped']) }}"

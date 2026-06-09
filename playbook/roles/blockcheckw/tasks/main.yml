@@ -1,0 +1,36 @@
+---
+- name: Check if blockcheckw is installed
+  ansible.builtin.raw: test -x /usr/bin/blockcheckw && echo INSTALLED || echo NOT_INSTALLED
+  register: bcw_check
+  changed_when: false
+
+- name: Download blockcheckw
+  ansible.builtin.raw: |
+    wget -q --timeout=60 -O /tmp/blockcheckw.tar.gz \
+      "https://github.com/rgaliull/openwrt/raw/refs/heads/main/aarch64_cortex-a53/blockcheckw-linux-arm64.tar.gz" \
+      && echo DOWNLOADED || echo FAILED
+  when: bcw_check.stdout_lines[-1] == 'NOT_INSTALLED'
+
+- name: Extract and install blockcheckw
+  ansible.builtin.raw: |
+    cd /tmp
+    tar -xzf blockcheckw.tar.gz
+    BIN=$(find /tmp -name blockcheckw -type f 2>/dev/null | head -1)
+    if [ -n "$BIN" ] && [ -s "$BIN" ]; then
+      mv -f "$BIN" /usr/bin/blockcheckw
+      chmod +x /usr/bin/blockcheckw
+      echo INSTALLED
+    else
+      echo FAILED
+    fi
+    rm -f blockcheckw.tar.gz
+  when: bcw_check.stdout_lines[-1] == 'NOT_INSTALLED'
+
+- name: Verify
+  ansible.builtin.raw: blockcheckw --version 2>/dev/null | head -1 || echo "OK (installed)"
+  register: bcw_ver
+  changed_when: false
+
+- name: Show version
+  ansible.builtin.debug:
+    msg: "blockcheckw: {{ bcw_ver.stdout_lines[0] | default('installed') }}"
