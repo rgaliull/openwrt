@@ -30,6 +30,9 @@
     - role: sing-box-extended
       tags: [sing-box-extended]
 
+    - role: zapret2
+      tags: [zapret2]
+
     - role: podkop-plus
       tags: [podkop-plus]
 
@@ -40,7 +43,7 @@
       tags: [blockcheckw]
 
     - role: blockcheckw-scan
-      tags: [blockcheckw-scan]
+      tags: [never, blockcheckw-scan]
 
   post_tasks:
     - name: Start podkop-plus service

@@ -1,0 +1,33 @@
+---
+- name: Check if zapret2 is installed
+  ansible.builtin.raw: |
+    if [ -f /etc/init.d/zapret2 ] && [ -f /opt/zapret2/config ]; then
+      echo INSTALLED
+    else
+      echo NOT_INSTALLED
+    fi
+  register: z2_check
+  changed_when: false
+
+- name: Install zapret2
+  ansible.builtin.raw: |
+    if [ "{{ pkg_manager }}" = "apk" ]; then
+      wget -q --timeout=60 -O /tmp/zapret2.zip \
+        "https://github.com/rgaliull/openwrt/raw/refs/heads/main/aarch64_cortex-a53/zapret2_v0.9.20260307_aarch64_cortex-a53.zip" \
+        || { echo DOWNLOAD_FAILED; exit 1; }
+      mkdir -p /tmp/ze2
+      unzip -o /tmp/zapret2.zip -d /tmp/ze2 >/dev/null 2>&1
+      apk add --allow-untrusted /tmp/ze2/apk/*.apk 2>/dev/null
+      rm -rf /tmp/zapret2.zip /tmp/ze2
+    else
+      opkg update 2>/dev/null
+      opkg install zapret2 luci-app-zapret2 2>/dev/null
+    fi
+    echo INSTALLED
+  timeout: 120
+  when: z2_check.stdout_lines[-1] == 'NOT_INSTALLED'
+
+- name: Enable zapret2 service (podkop-plus manages it)
+  ansible.builtin.raw: /etc/init.d/zapret2 enable 2>/dev/null; true
+  changed_when: false
+  failed_when: false
